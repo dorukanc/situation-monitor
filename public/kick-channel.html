@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head><title>Kick Channel Resolver</title></head>
+<body style="background:#0a0a0a;color:#53fc18;font-family:monospace;padding:20px">
+<div id="status">Fetching channel...</div>
+<script>
+const params = new URLSearchParams(window.location.search);
+const slug = params.get('slug');
+const callbackId = params.get('cb');
+
+if (!slug) {
+  document.getElementById('status').textContent = 'Error: no channel slug';
+} else {
+  document.getElementById('status').textContent = 'Fetching VODs for ' + slug + '...';
+
+  fetch('https://kick.com/api/v1/channels/' + slug, {
+    headers: { 'Accept': 'application/json' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    const streams = data.previous_livestreams || [];
+    const vods = streams.slice(0, 20).map(function(ls) {
+      return {
+        uuid: ls.video ? ls.video.uuid : '',
+        title: ls.session_title || 'Untitled',
+        thumbnail: ls.thumbnail ? (ls.thumbnail.src || ls.thumbnail.url || null) : null,
+        createdAt: ls.created_at || '',
+        duration: ls.duration || 0,
+      };
+    }).filter(function(v) { return v.uuid; });
+
+    document.getElementById('status').textContent = 'Found ' + vods.length + ' VODs. Closing...';
+    if (window.opener) {
+      window.opener.postMessage({
+        type: 'kick-channel-resolved',
+        callbackId: callbackId,
+        slug: slug,
+        vods: vods,
+      }, '*');
+    }
+    setTimeout(function() { window.close(); }, 500);
+  })
+  .catch(function(err) {
+    document.getElementById('status').textContent = 'Error: ' + err.message +
+      '. Make sure you have visited kick.com recently.';
+  });
+}
+</script>
+</body>
+</html>

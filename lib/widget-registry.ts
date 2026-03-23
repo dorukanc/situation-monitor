@@ -20,6 +20,7 @@ export const WIDGET_REGISTRY: WidgetMeta[] = [
   { id: "weather", name: "Weather", size: "mini", description: "Current weather conditions" },
   { id: "pomodoro", name: "Pomodoro", size: "mini", description: "Focus timer (25/5 cycle)" },
   { id: "stopwatch", name: "Stopwatch", size: "mini-wide", description: "Simple stopwatch with start/pause/reset" },
+  { id: "kickvod", name: "Kick VODs", size: "normal", description: "Watch Kick stream replays" },
 ];
 
 export const DEFAULT_LAYOUT: string[] = [

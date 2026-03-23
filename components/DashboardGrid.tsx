@@ -14,6 +14,7 @@ import HackerNewsWidget from "./HackerNewsWidget";
 import ClockWidget from "./ClockWidget";
 import WeatherWidget from "./WeatherWidget";
 import StopwatchWidget from "./StopwatchWidget";
+import KickVodWidget from "./KickVodWidget";
 import WidgetPane from "./WidgetPane";
 
 const WIDGET_COMPONENTS: Record<string, React.ComponentType> = {
@@ -29,6 +30,7 @@ const WIDGET_COMPONENTS: Record<string, React.ComponentType> = {
   weather: WeatherWidget,
   pomodoro: PomodoroWidget,
   stopwatch: StopwatchWidget,
+  kickvod: KickVodWidget,
 };
 
 export default function DashboardGrid() {

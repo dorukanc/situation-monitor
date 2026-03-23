@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head><title>Kick VOD Resolver</title></head>
+<body style="background:#0a0a0a;color:#53fc18;font-family:monospace;padding:20px">
+<div id="status">Resolving VOD...</div>
+<script>
+// This page runs in the browser context where Cloudflare cookies for kick.com exist.
+// It fetches the VOD source from Kick's API and posts it back to the opener.
+const params = new URLSearchParams(window.location.search);
+const videoId = params.get('video');
+const callbackId = params.get('cb');
+
+if (!videoId) {
+  document.getElementById('status').textContent = 'Error: no video ID';
+} else {
+  document.getElementById('status').textContent = 'Fetching VOD: ' + videoId + '...';
+
+  fetch('https://kick.com/api/v1/video/' + videoId, {
+    headers: { 'Accept': 'application/json' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.source) {
+      document.getElementById('status').textContent = 'Resolved! Closing...';
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'kick-vod-resolved',
+          callbackId: callbackId,
+          videoId: videoId,
+          source: data.source,
+          title: data.livestream?.session_title || 'Untitled VOD',
+          thumbnail: data.livestream?.thumbnail || null,
+          duration: data.livestream?.duration || 0,
+          createdAt: data.created_at || '',
+        }, '*');
+      }
+      setTimeout(() => window.close(), 500);
+    } else {
+      document.getElementById('status').textContent = 'Error: no source in response';
+    }
+  })
+  .catch(err => {
+    document.getElementById('status').textContent = 'Error: ' + err.message +
+      '. Make sure you have visited kick.com recently so Cloudflare cookies are set.';
+  });
+}
+</script>
+</body>
+</html>
