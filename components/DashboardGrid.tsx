@@ -13,6 +13,7 @@ import YouTubeMusicWidget from "./YouTubeMusicWidget";
 import HackerNewsWidget from "./HackerNewsWidget";
 import ClockWidget from "./ClockWidget";
 import WeatherWidget from "./WeatherWidget";
+import StopwatchWidget from "./StopwatchWidget";
 import WidgetPane from "./WidgetPane";
 
 const WIDGET_COMPONENTS: Record<string, React.ComponentType> = {
@@ -27,6 +28,7 @@ const WIDGET_COMPONENTS: Record<string, React.ComponentType> = {
   efficiency: EfficiencyWidget,
   weather: WeatherWidget,
   pomodoro: PomodoroWidget,
+  stopwatch: StopwatchWidget,
 };
 
 export default function DashboardGrid() {
@@ -61,10 +63,17 @@ export default function DashboardGrid() {
 
     const flushMinis = () => {
       if (miniBuffer.length === 0) return;
+      // Count how many "slots" are used (mini-wide = 2 slots, mini = 1 slot)
+      const slots = miniBuffer.reduce((sum, id) => {
+        const m = getWidgetMeta(id);
+        return sum + (m?.size === "mini-wide" ? 2 : 1);
+      }, 0);
+      const rows = Math.ceil(slots / 2);
       elements.push(
         <div
           key={`mini-group-${miniBuffer.join("-")}`}
-          className="grid grid-cols-2 grid-rows-2 gap-2 min-h-0"
+          className="grid grid-cols-2 gap-2 min-h-0"
+          style={{ gridTemplateRows: `repeat(${rows}, 1fr)` }}
         >
           {miniBuffer.map((id) => {
             const Component = WIDGET_COMPONENTS[id];
@@ -79,10 +88,14 @@ export default function DashboardGrid() {
       const meta = getWidgetMeta(id);
       if (!meta) continue;
 
-      if (meta.size === "mini") {
+      if (meta.size === "mini" || meta.size === "mini-wide") {
         miniBuffer.push(id);
-        // Flush when we have 4 minis
-        if (miniBuffer.length === 4) {
+        // Count slots used so far
+        const slots = miniBuffer.reduce((sum, mid) => {
+          const m = getWidgetMeta(mid);
+          return sum + (m?.size === "mini-wide" ? 2 : 1);
+        }, 0);
+        if (slots >= 6) {
           flushMinis();
         }
       } else {
@@ -102,8 +115,13 @@ export default function DashboardGrid() {
 
   // Compute grid dimensions based on widget count
   const normalCount = layout.filter((id) => getWidgetMeta(id)?.size === "normal").length;
-  const miniCount = layout.filter((id) => getWidgetMeta(id)?.size === "mini").length;
-  const miniGroups = miniCount > 0 ? Math.ceil(miniCount / 4) : 0;
+  const miniSlots = layout.reduce((sum, id) => {
+    const m = getWidgetMeta(id);
+    if (m?.size === "mini") return sum + 1;
+    if (m?.size === "mini-wide") return sum + 2;
+    return sum;
+  }, 0);
+  const miniGroups = miniSlots > 0 ? Math.ceil(miniSlots / 6) : 0;
   const totalCells = normalCount + miniGroups;
   const cols = totalCells <= 4 ? 2 : 3;
   const rows = Math.ceil(totalCells / cols);

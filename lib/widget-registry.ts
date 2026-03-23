@@ -1,4 +1,4 @@
-export type WidgetSize = "normal" | "mini";
+export type WidgetSize = "normal" | "mini" | "mini-wide";
 
 export interface WidgetMeta {
   id: string;
@@ -19,11 +19,12 @@ export const WIDGET_REGISTRY: WidgetMeta[] = [
   { id: "efficiency", name: "Efficiency", size: "mini", description: "Daily productivity score" },
   { id: "weather", name: "Weather", size: "mini", description: "Current weather conditions" },
   { id: "pomodoro", name: "Pomodoro", size: "mini", description: "Focus timer (25/5 cycle)" },
+  { id: "stopwatch", name: "Stopwatch", size: "mini-wide", description: "Simple stopwatch with start/pause/reset" },
 ];
 
 export const DEFAULT_LAYOUT: string[] = [
   "globe", "github", "todo", "hackernews", "spotify",
-  "clock", "efficiency", "weather", "pomodoro",
+  "clock", "efficiency", "weather", "pomodoro", "stopwatch",
 ];
 
 export const LAYOUT_STORAGE_KEY = "sm-widget-layout";

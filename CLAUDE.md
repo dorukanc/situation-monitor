@@ -57,7 +57,7 @@ Dynamic grid managed by `DashboardGrid.tsx`. Layout order stored in localStorage
 - `/api/spotify/refresh` — Refreshes expired Spotify access tokens.
 
 ## Key Files
-- `lib/config.ts` — GitHub username (`dorukanc`), intervals, efficiency targets
+- `lib/config.ts` — GitHub username (from `NEXT_PUBLIC_GITHUB_USERNAME` env var), intervals, efficiency targets
 - `lib/efficiency.ts` — Score calculation formula + helpers
 - `hooks/useLocalStorage.ts` — SSR-safe localStorage hook with hydration flag
 - `.env.local` — `GITHUB_TOKEN` (classic PAT with `repo` scope), `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`

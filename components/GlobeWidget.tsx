@@ -13,7 +13,7 @@ const CITIES: { name: string; lat: number; lng: number; tz: string }[] = [
   { name: "SF", lat: 37.77, lng: -122.42, tz: "America/Los_Angeles" },
 ];
 
-// Your location (Istanbul)
+// Default map center (Istanbul)
 const MY_LOCATION: [number, number] = [41.01, 28.98];
 
 function getCityTime(tz: string): string {

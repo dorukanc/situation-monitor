@@ -1,6 +1,6 @@
 export const CONFIG = {
   github: {
-    username: "dorukanc",
+    username: process.env.NEXT_PUBLIC_GITHUB_USERNAME || "your-username",
     refreshInterval: 5 * 60 * 1000, // 5 minutes
   },
   pomodoro: {
