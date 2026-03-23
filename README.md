@@ -4,6 +4,8 @@ A dark, terminal-aesthetic personal dashboard for tracking productivity. Inspire
 
 Built with Next.js 16, Tailwind CSS v4, and TypeScript. All data lives in localStorage — no database, no accounts, runs entirely on your machine.
 
+![Situation Monitor Dashboard](screenshot.png)
+
 ## Widgets
 
 | Widget | Description |
