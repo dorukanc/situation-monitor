@@ -35,18 +35,21 @@ export async function GET() {
     }
 
     for (const event of events) {
+      const date = event.created_at.split("T")[0];
+      if (!(date in counts)) continue;
+
       if (event.type === "PushEvent") {
-        const date = event.created_at.split("T")[0];
-        if (date in counts) {
-          // payload.commits exists for public repos, missing for private
-          // payload.size has commit count, fall back to 1 per push
-          const commitCount =
-            event.payload?.commits?.length ??
-            event.payload?.size ??
-            event.payload?.distinct_size ??
-            1;
-          counts[date] += commitCount;
-        }
+        // payload.commits exists for public repos, missing for private
+        // payload.size has commit count, fall back to 1 per push
+        const commitCount =
+          event.payload?.commits?.length ??
+          event.payload?.size ??
+          event.payload?.distinct_size ??
+          1;
+        counts[date] += commitCount;
+      } else if (event.type === "CreateEvent") {
+        // Repo/branch creation with initial push — count as 1
+        counts[date] += 1;
       }
     }
 
