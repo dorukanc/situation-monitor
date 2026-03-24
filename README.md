@@ -15,13 +15,17 @@ Built with Next.js 16, Tailwind CSS v4, and TypeScript. All data lives in localS
 | **Tasks** | Todo list with per-task time tracking |
 | **HN Feed** | Top 5 Hacker News stories, auto-refreshes every 15 min |
 | **Spotify** | Now playing, playback controls, playlist browser (requires Spotify auth) |
+| **YouTube** | Quick-switch live stream embeds |
+| **YT Music** | YouTube Music player with playlist browser (requires Google auth) |
 | **Clock** | Live clock, ticks every second |
 | **Efficiency Score** | 0–100 score combining pomodoro sessions + commits + completed todos |
 | **Weather** | Current conditions via Open-Meteo (no API key needed) |
 | **Pomodoro** | 25/5 work-break timer with session history |
+| **Stopwatch** | Start/pause/reset stopwatch mini widget |
+| **Kick Live + VOD** | Browse Kick streamers, watch live streams, and open recent VODs |
 | **Status Ticker** | Scrolling ticker bar for cross-widget notifications |
 
-The dashboard layout is customizable — click the gear icon (bottom-right) to add, remove, or reorder widgets via drag-and-drop.
+The dashboard ships with 13 configurable widgets. Click the gear icon in the bottom-right corner to add, remove, or reorder them via drag-and-drop.
 
 ## Getting Started
 
@@ -109,6 +113,7 @@ No API key needed — uses [Open-Meteo](https://open-meteo.com/). Defaults to Is
 - **Tailwind CSS v4** — `@theme inline` configuration
 - **TypeScript**
 - **cobe** — 3D globe rendering
+- **hls.js** — HLS playback for Kick live streams and VODs
 - No charting libraries — bars, gauges, and sparklines are plain divs and SVG
 - No state management library — localStorage + CustomEvent for cross-widget communication
 
@@ -119,10 +124,20 @@ app/
   api/
     github/       # Proxies GitHub Events API
     hackernews/   # Fetches top HN stories
-    weather/      # Proxies Open-Meteo
+    kick/         # Proxies Kick channel/VOD metadata
+    kick-live/    # Proxies Kick live HLS playlists and media
     spotify/      # OAuth flow + token refresh
+    weather/      # Proxies Open-Meteo
+    ytmusic/      # OAuth flow + token refresh
 components/
   DashboardGrid.tsx   # Main grid layout manager
+  FlowToggle.tsx      # Global flow mode toggle
+  GitHubActivity.tsx  # GitHub commits widget
+  KickVodWidget.tsx   # Kick live + VOD player
+  StatusTicker.tsx    # Cross-widget ticker
+  StopwatchWidget.tsx # Stopwatch mini widget
+  YouTubeWidget.tsx   # YouTube live streams widget
+  YouTubeMusicWidget.tsx # YT Music player
   WidgetCard.tsx      # Shared widget wrapper
   WidgetPane.tsx      # Widget configuration panel
   *Widget.tsx         # Individual widget components
