@@ -36,6 +36,9 @@ if (!slug) {
         callbackId: callbackId,
         slug: slug,
         vods: vods,
+        playbackUrl: data.playback_url || null,
+        isLive: Boolean(data.livestream || data.playback_url),
+        title: (data.livestream && data.livestream.session_title) || data.stream_title || slug.toUpperCase(),
       }, '*');
     }
     setTimeout(function() { window.close(); }, 500);

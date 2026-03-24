@@ -26,13 +26,39 @@ interface PlayingVod {
   hlsUrl: string;
 }
 
+interface PlayingLive {
+  slug: string;
+  title: string;
+  hlsUrl: string;
+}
+
+interface ChannelResolveResult {
+  vods: {
+    uuid: string;
+    title: string;
+    thumbnail: string | null;
+    createdAt: string;
+    duration: number;
+  }[];
+  playbackUrl: string | null;
+  isLive: boolean;
+  title: string;
+}
+
 type View = "streamers" | "vods" | "player";
+type PlayerMode = "live" | "vod";
 
 /* ── Helpers ──────────────────────────────────────────────────── */
 
 function parseKickUrl(url: string): { username: string; videoId: string } | null {
   const match = url.match(/kick\.com\/([a-zA-Z0-9_-]+)\/videos\/([a-zA-Z0-9_-]+)/);
   if (match) return { username: match[1], videoId: match[2] };
+  return null;
+}
+
+function parseKickChannelUrl(url: string): { username: string } | null {
+  const match = url.match(/kick\.com\/([a-zA-Z0-9_-]+)\/?$/);
+  if (match) return { username: match[1] };
   return null;
 }
 
@@ -45,13 +71,7 @@ function formatDuration(seconds: number): string {
 }
 
 /** Fetch channel VODs via popup (uses browser's Cloudflare cookies) */
-function fetchChannelViaPopup(slug: string): Promise<{
-  uuid: string;
-  title: string;
-  thumbnail: string | null;
-  createdAt: string;
-  duration: number;
-}[]> {
+function resolveChannelViaPopup(slug: string): Promise<ChannelResolveResult> {
   return new Promise((resolve, reject) => {
     const cbId = `kick-ch-${Date.now()}`;
     const timeout = setTimeout(() => {
@@ -63,7 +83,12 @@ function fetchChannelViaPopup(slug: string): Promise<{
       if (e.data?.type === "kick-channel-resolved" && e.data.callbackId === cbId) {
         clearTimeout(timeout);
         window.removeEventListener("message", handler);
-        resolve(e.data.vods || []);
+        resolve({
+          vods: e.data.vods || [],
+          playbackUrl: e.data.playbackUrl || null,
+          isLive: Boolean(e.data.isLive),
+          title: e.data.title || slug.toUpperCase(),
+        });
       }
     }
 
@@ -122,15 +147,20 @@ export default function KickVodWidget() {
   const [vods, setVods] = useState<VodEntry[]>([]);
   const [vodsLoading, setVodsLoading] = useState(false);
   const [playing, setPlaying] = useState<PlayingVod | null>(null);
+  const [playingLive, setPlayingLive] = useState<PlayingLive | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newSlug, setNewSlug] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const [vodError, setVodError] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [flowMode, setFlowMode] = useState(false);
+  const [playerMode, setPlayerMode] = useState<PlayerMode>("vod");
+  const [volume, setVolume] = useState(100);
+  const [muted, setMuted] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const volumeBeforeMuteRef = useRef(100);
 
   // Listen for flow mode
   useEffect(() => {
@@ -159,25 +189,39 @@ export default function KickVodWidget() {
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.muted = muted;
+        video.volume = (muted ? 0 : volume) / 100;
         video.play().catch(() => {});
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
-      video.addEventListener("loadedmetadata", () => { video.play().catch(() => {}); }, { once: true });
+      video.addEventListener("loadedmetadata", () => {
+        video.muted = muted;
+        video.volume = (muted ? 0 : volume) / 100;
+        video.play().catch(() => {});
+      }, { once: true });
     }
-  }, []);
+  }, [muted, volume]);
 
-  // When playing changes, load HLS
+  // When playback source changes, load HLS
   useEffect(() => {
-    if (!playing?.hlsUrl) return;
-    loadHls(playing.hlsUrl);
+    const activeUrl = playerMode === "live" ? playingLive?.hlsUrl : playing?.hlsUrl;
+    if (!activeUrl) return;
+    loadHls(activeUrl);
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [playing, loadHls]);
+  }, [loadHls, playerMode, playing, playingLive]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = muted;
+    video.volume = (muted ? 0 : volume) / 100;
+  }, [muted, volume, playerMode, playing, playingLive]);
 
   // Fetch VODs for a streamer via popup resolver for channel data
   const fetchVods = useCallback(async (slug: string) => {
@@ -209,8 +253,8 @@ export default function KickVodWidget() {
     } catch {
       // Fallback: popup resolver (uses browser's Cloudflare cookies)
       try {
-        const rawVods = await fetchChannelViaPopup(slug);
-        const vodList: VodEntry[] = rawVods.map((v) => ({
+        const channelData = await resolveChannelViaPopup(slug);
+        const vodList: VodEntry[] = channelData.vods.map((v) => ({
           uuid: v.uuid,
           title: v.title,
           thumbnail: v.thumbnail,
@@ -231,6 +275,8 @@ export default function KickVodWidget() {
   const resolveAndPlay = useCallback(async (vodUuid: string, title: string, streamerSlug: string) => {
     setResolving(true);
     setVodError(null);
+    setPlayingLive(null);
+    setPlayerMode("vod");
     try {
       // Try server proxy first
       const res = await fetch(`/api/kick?path=/api/v1/video/${vodUuid}`);
@@ -276,9 +322,62 @@ export default function KickVodWidget() {
   };
 
   const openStreamerVods = (streamer: Streamer) => {
+    setPlaying(null);
+    setPlayingLive(null);
+    setPlayerMode("vod");
     setActiveStreamer(streamer);
     setView("vods");
     fetchVods(streamer.slug);
+  };
+
+  const openLiveStream = useCallback(async (streamer: Streamer) => {
+    setResolving(true);
+    setVodError(null);
+    setActiveStreamer(streamer);
+    setPlaying(null);
+    setPlayingLive(null);
+    try {
+      const res = await fetch(`/api/kick?path=/api/v1/channels/${streamer.slug}`);
+      if (!res.ok) throw new Error("blocked");
+      const data = await res.json();
+      if (data.error) throw new Error("blocked");
+      if (!data.playback_url) {
+        throw new Error("This channel is offline right now");
+      }
+      setPlayingLive({
+        slug: streamer.slug,
+        title: data.livestream?.session_title || `${streamer.label} LIVE`,
+        hlsUrl: data.playback_url,
+      });
+      setPlayerMode("live");
+      setView("player");
+    } catch {
+      try {
+        const channelData = await resolveChannelViaPopup(streamer.slug);
+        if (!channelData.playbackUrl || !channelData.isLive) {
+          throw new Error("This channel is offline right now");
+        }
+        setPlayingLive({
+          slug: streamer.slug,
+          title: channelData.title || `${streamer.label} LIVE`,
+          hlsUrl: channelData.playbackUrl,
+        });
+        setPlayerMode("live");
+        setView("player");
+      } catch (err) {
+        setVodError(err instanceof Error ? err.message : "Failed to open live stream");
+      }
+    } finally {
+      setResolving(false);
+    }
+  }, []);
+
+  const handleBackFromPlayer = () => {
+    if (playerMode === "live") {
+      setView("streamers");
+      return;
+    }
+    setView(activeStreamer ? "vods" : "streamers");
   };
 
   // Quick play
@@ -289,18 +388,29 @@ export default function KickVodWidget() {
     // Kick VOD URL → resolve via popup
     const parsed = parseKickUrl(url);
     if (parsed) {
+      setPlayingLive(null);
+      setPlayerMode("vod");
       resolveAndPlay(parsed.videoId, parsed.username, parsed.username);
+      setManualUrl("");
+      return;
+    }
+    const liveChannel = parseKickChannelUrl(url);
+    if (liveChannel) {
+      const streamer = { slug: liveChannel.username, label: liveChannel.username.toUpperCase() };
+      openLiveStream(streamer);
       setManualUrl("");
       return;
     }
     // Direct m3u8
     if (url.includes(".m3u8")) {
+      setPlayingLive(null);
+      setPlayerMode("vod");
       setPlaying({ uuid: `manual-${Date.now()}`, title: "Manual VOD", streamer: "", hlsUrl: url });
       setView("player");
       setManualUrl("");
       return;
     }
-    setVodError("Paste a Kick VOD URL or m3u8 URL");
+    setVodError("Paste a Kick channel URL, Kick VOD URL, or m3u8 URL");
   };
 
   if (!hydrated) {
@@ -312,32 +422,97 @@ export default function KickVodWidget() {
   }
 
   const indicatorColor = flowMode ? "#ff3333" : "#53fc18";
+  const isLiveActive = view === "player" && playerMode === "live" && !!playingLive;
+  const indicatorLabel = isLiveActive ? "LIVE" : "VOD";
+  const displayedVolume = muted ? 0 : volume;
+
+  const handleVolumeChange = (value: number) => {
+    setVolume(value);
+    setMuted(value === 0);
+    if (value > 0) {
+      volumeBeforeMuteRef.current = value;
+    }
+  };
+
+  const toggleMute = () => {
+    if (muted) {
+      const restoredVolume = volumeBeforeMuteRef.current || 100;
+      setMuted(false);
+      setVolume(restoredVolume);
+      return;
+    }
+    volumeBeforeMuteRef.current = volume;
+    setMuted(true);
+  };
 
   /* ── Player View ─────────────────────────────────────────────── */
-  if (view === "player" && playing) {
+  if (view === "player" && (playing || playingLive)) {
     return (
       <div className="border border-border bg-surface rounded-sm flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2 border-b border-border">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setView(activeStreamer ? "vods" : "streamers")}
+              onClick={handleBackFromPlayer}
               className="text-[10px] text-muted hover:text-green transition-colors cursor-pointer"
             >
               {"<"} Back
             </button>
             <h2 className="text-[10px] uppercase tracking-[0.2em] text-muted font-medium truncate">
-              {playing.title}
+              {playerMode === "live" ? playingLive?.title : playing?.title}
             </h2>
           </div>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: indicatorColor }} />
-            <span className="text-[9px] uppercase tracking-wider" style={{ color: indicatorColor }}>
-              VOD
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleMute}
+              className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 border transition-colors cursor-pointer ${
+                muted
+                  ? "border-muted text-muted hover:border-foreground hover:text-foreground"
+                  : "border-green/30 text-green"
+              }`}
+            >
+              {muted ? "Unmute" : "Mute"}
+            </button>
+            <span className="flex items-center gap-1">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${isLiveActive ? "pulse-dot" : ""}`}
+                style={{ backgroundColor: indicatorColor }}
+              />
+              <span className="text-[9px] uppercase tracking-wider" style={{ color: indicatorColor }}>
+                {indicatorLabel}
+              </span>
             </span>
-          </span>
+          </div>
         </div>
         <div className="flex-1 min-h-0 bg-black">
-          <video ref={videoRef} className="w-full h-full" controls playsInline />
+          <video
+            ref={videoRef}
+            className="w-full h-full"
+            controls
+            playsInline
+          />
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 border-t border-border bg-background/60">
+          <span
+            className={`text-[8px] uppercase tracking-wider cursor-pointer transition-colors flex-shrink-0 ${
+              muted ? "text-muted" : "text-green"
+            }`}
+          >
+            VOL
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={displayedVolume}
+            onChange={(e) => handleVolumeChange(Number(e.target.value))}
+            className="flex-1 h-1 accent-green cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, var(--color-green) ${displayedVolume}%, #1a1a1a ${displayedVolume}%)`,
+            }}
+          />
+          <span className="text-[8px] text-muted w-6 text-right flex-shrink-0">
+            {displayedVolume}
+          </span>
         </div>
       </div>
     );
@@ -362,7 +537,7 @@ export default function KickVodWidget() {
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: indicatorColor }} />
             <span className="text-[9px] uppercase tracking-wider" style={{ color: indicatorColor }}>
-              VOD
+              {indicatorLabel}
             </span>
           </span>
         </div>
@@ -374,7 +549,7 @@ export default function KickVodWidget() {
             value={manualUrl}
             onChange={(e) => { setManualUrl(e.target.value); setVodError(null); }}
             onKeyDown={(e) => e.key === "Enter" && playManual()}
-            placeholder="Paste VOD URL or m3u8..."
+            placeholder="Paste channel URL, VOD URL, or m3u8..."
             className="flex-1 bg-background border border-border text-[10px] px-2 py-1 text-foreground placeholder:text-muted focus:outline-none focus:border-green-dim"
           />
           <button
@@ -448,12 +623,15 @@ export default function KickVodWidget() {
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
         <div className="flex items-center gap-2">
           <h2 className="text-[10px] uppercase tracking-[0.2em] text-muted font-medium">
-            Kick VODs
+            Kick Live + VOD
           </h2>
           <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: indicatorColor }} />
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${isLiveActive ? "pulse-dot" : ""}`}
+              style={{ backgroundColor: indicatorColor }}
+            />
             <span className="text-[9px] uppercase tracking-wider" style={{ color: indicatorColor }}>
-              VOD
+              {indicatorLabel}
             </span>
           </span>
         </div>
@@ -495,7 +673,7 @@ export default function KickVodWidget() {
           value={manualUrl}
           onChange={(e) => { setManualUrl(e.target.value); setVodError(null); }}
           onKeyDown={(e) => e.key === "Enter" && playManual()}
-          placeholder="Quick play — paste VOD URL or m3u8..."
+          placeholder="Quick play — paste channel URL, VOD URL, or m3u8..."
           className="flex-1 bg-background border border-border text-[10px] px-2 py-1 text-foreground placeholder:text-muted focus:outline-none focus:border-green-dim"
         />
         <button
@@ -525,15 +703,26 @@ export default function KickVodWidget() {
               key={s.slug}
               className="flex items-center justify-between px-3 py-2 hover:bg-green/5 border-b border-border/50 transition-colors group"
             >
-              <button
-                onClick={() => openStreamerVods(s)}
-                className="flex-1 text-left cursor-pointer"
-              >
-                <span className="text-[11px] text-foreground group-hover:text-green transition-colors font-medium">
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] text-foreground group-hover:text-green transition-colors font-medium">
                   {s.label}
-                </span>
-                <span className="text-[9px] text-muted ml-2">kick.com/{s.slug}</span>
-              </button>
+                </div>
+                <span className="text-[9px] text-muted">kick.com/{s.slug}</span>
+              </div>
+              <div className="flex items-center gap-1 ml-2">
+                <button
+                  onClick={() => openLiveStream(s)}
+                  className="text-[9px] uppercase tracking-wider px-2 py-1 border border-green-dim text-green-dim hover:bg-green-dim/10 transition-colors cursor-pointer"
+                >
+                  Live
+                </button>
+                <button
+                  onClick={() => openStreamerVods(s)}
+                  className="text-[9px] uppercase tracking-wider px-2 py-1 border border-border text-muted hover:text-green hover:border-green-dim transition-colors cursor-pointer"
+                >
+                  VODs
+                </button>
+              </div>
               <button
                 onClick={() => removeStreamer(s.slug)}
                 className="text-[9px] text-muted hover:text-red transition-colors cursor-pointer px-1"
