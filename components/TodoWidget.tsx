@@ -47,12 +47,14 @@ export default function TodoWidget() {
   const toggleTodo = (id: string) => {
     // Stop timer if completing active item
     if (id === activeId) stopTimer();
+    const todo = todos.find((t) => t.id === id);
+    if (todo && !todo.done) {
+      queueMicrotask(() => sendTickerMessage(`TODO COMPLETE: ${todo.text.toUpperCase()}`));
+    }
     setTodos((prev) =>
       prev.map((t) => {
         if (t.id === id) {
-          const newDone = !t.done;
-          if (newDone) sendTickerMessage(`TODO COMPLETE: ${t.text.toUpperCase()}`);
-          return { ...t, done: newDone };
+          return { ...t, done: !t.done };
         }
         return t;
       })
