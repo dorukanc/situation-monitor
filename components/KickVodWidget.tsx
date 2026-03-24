@@ -32,6 +32,15 @@ interface PlayingLive {
   hlsUrl: string;
 }
 
+interface LiveErrorData {
+  details?: string;
+  fatal?: boolean;
+  response?: {
+    code?: number;
+    text?: string;
+  };
+}
+
 interface ChannelResolveResult {
   vods: {
     uuid: string;
@@ -189,15 +198,32 @@ export default function KickVodWidget() {
     }
     if (Hls.isSupported()) {
       const hls = new Hls({
-        lowLatencyMode: isLive,
-        liveSyncDurationCount: isLive ? 3 : undefined,
+        // For dashboard viewing, prefer smoother live playback over chasing the lowest latency.
+        lowLatencyMode: false,
+        liveSyncDurationCount: isLive ? 6 : undefined,
+        liveMaxLatencyDurationCount: isLive ? 10 : undefined,
+        maxBufferLength: isLive ? 45 : undefined,
+        backBufferLength: isLive ? 90 : undefined,
+        maxLiveSyncPlaybackRate: 1,
       });
       hlsRef.current = hls;
       hls.loadSource(url);
       hls.attachMedia(video);
-      const seekToLiveEdge = () => {
+      const seekToLiveEdge = (force = false) => {
         const liveSyncPosition = hls.liveSyncPosition;
         if (!isLive || liveSyncPosition == null || !Number.isFinite(liveSyncPosition)) return;
+        if (!force) {
+          const maxLatency = hls.maxLatency;
+          const latency = hls.latency;
+          if (
+            !Number.isFinite(latency) ||
+            !Number.isFinite(maxLatency) ||
+            maxLatency <= 0 ||
+            latency <= maxLatency
+          ) {
+            return;
+          }
+        }
         video.currentTime = Math.max(liveSyncPosition - 1, 0);
       };
       hls.on(Hls.Events.LEVEL_LOADED, (_event, data) => {
@@ -206,10 +232,15 @@ export default function KickVodWidget() {
         }
       });
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        seekToLiveEdge();
+        seekToLiveEdge(true);
         video.muted = muted;
         video.volume = (muted ? 0 : volume) / 100;
         video.play().catch(() => {});
+      });
+      hls.on(Hls.Events.ERROR, (_event, data: LiveErrorData) => {
+        const detail = data.details || "unknown";
+        const status = data.response?.code ? ` (${data.response.code})` : "";
+        setVodError(`Live stream load failed: ${detail}${status}`);
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
@@ -221,6 +252,9 @@ export default function KickVodWidget() {
         video.muted = muted;
         video.volume = (muted ? 0 : volume) / 100;
         video.play().catch(() => {});
+      }, { once: true });
+      video.addEventListener("error", () => {
+        setVodError("Live stream load failed in native HLS player");
       }, { once: true });
     }
   }, [muted, volume]);
@@ -446,16 +480,6 @@ export default function KickVodWidget() {
   const indicatorColor = flowMode ? "#ff3333" : "#53fc18";
   const isLiveActive = view === "player" && playerMode === "live" && !!playingLive;
   const indicatorLabel = isLiveActive ? "LIVE" : "VOD";
-  const displayedVolume = muted ? 0 : volume;
-
-  const handleVolumeChange = (value: number) => {
-    setVolume(value);
-    setMuted(value === 0);
-    if (value > 0) {
-      volumeBeforeMuteRef.current = value;
-    }
-  };
-
   const toggleMute = () => {
     if (muted) {
       const restoredVolume = volumeBeforeMuteRef.current || 100;
@@ -512,29 +536,6 @@ export default function KickVodWidget() {
             controls
             playsInline
           />
-        </div>
-        <div className="flex items-center gap-2 px-3 py-2 border-t border-border bg-background/60">
-          <span
-            className={`text-[8px] uppercase tracking-wider cursor-pointer transition-colors flex-shrink-0 ${
-              muted ? "text-muted" : "text-green"
-            }`}
-          >
-            VOL
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={displayedVolume}
-            onChange={(e) => handleVolumeChange(Number(e.target.value))}
-            className="flex-1 h-1 accent-green cursor-pointer"
-            style={{
-              background: `linear-gradient(to right, var(--color-green) ${displayedVolume}%, #1a1a1a ${displayedVolume}%)`,
-            }}
-          />
-          <span className="text-[8px] text-muted w-6 text-right flex-shrink-0">
-            {displayedVolume}
-          </span>
         </div>
       </div>
     );
