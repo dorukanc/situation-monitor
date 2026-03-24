@@ -62,6 +62,10 @@ function parseKickChannelUrl(url: string): { username: string } | null {
   return null;
 }
 
+function getProxiedLiveUrl(url: string): string {
+  return `/api/kick-live?url=${encodeURIComponent(url)}`;
+}
+
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -176,7 +180,7 @@ export default function KickVodWidget() {
   }, []);
 
   // Load HLS
-  const loadHls = useCallback((url: string) => {
+  const loadHls = useCallback((url: string, isLive: boolean) => {
     const video = videoRef.current;
     if (!video) return;
     if (hlsRef.current) {
@@ -184,11 +188,25 @@ export default function KickVodWidget() {
       hlsRef.current = null;
     }
     if (Hls.isSupported()) {
-      const hls = new Hls();
+      const hls = new Hls({
+        lowLatencyMode: isLive,
+        liveSyncDurationCount: isLive ? 3 : undefined,
+      });
       hlsRef.current = hls;
       hls.loadSource(url);
       hls.attachMedia(video);
+      const seekToLiveEdge = () => {
+        const liveSyncPosition = hls.liveSyncPosition;
+        if (!isLive || liveSyncPosition == null || !Number.isFinite(liveSyncPosition)) return;
+        video.currentTime = Math.max(liveSyncPosition - 1, 0);
+      };
+      hls.on(Hls.Events.LEVEL_LOADED, (_event, data) => {
+        if (data.details.live) {
+          seekToLiveEdge();
+        }
+      });
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        seekToLiveEdge();
         video.muted = muted;
         video.volume = (muted ? 0 : volume) / 100;
         video.play().catch(() => {});
@@ -196,6 +214,10 @@ export default function KickVodWidget() {
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
       video.addEventListener("loadedmetadata", () => {
+        if (isLive && video.seekable.length > 0 && Number.isFinite(video.seekable.end(video.seekable.length - 1))) {
+          const liveEdge = video.seekable.end(video.seekable.length - 1);
+          video.currentTime = Math.max(liveEdge - 1, 0);
+        }
         video.muted = muted;
         video.volume = (muted ? 0 : volume) / 100;
         video.play().catch(() => {});
@@ -207,7 +229,7 @@ export default function KickVodWidget() {
   useEffect(() => {
     const activeUrl = playerMode === "live" ? playingLive?.hlsUrl : playing?.hlsUrl;
     if (!activeUrl) return;
-    loadHls(activeUrl);
+    loadHls(activeUrl, playerMode === "live");
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
@@ -347,7 +369,7 @@ export default function KickVodWidget() {
       setPlayingLive({
         slug: streamer.slug,
         title: data.livestream?.session_title || `${streamer.label} LIVE`,
-        hlsUrl: data.playback_url,
+        hlsUrl: getProxiedLiveUrl(data.playback_url),
       });
       setPlayerMode("live");
       setView("player");
@@ -360,7 +382,7 @@ export default function KickVodWidget() {
         setPlayingLive({
           slug: streamer.slug,
           title: channelData.title || `${streamer.label} LIVE`,
-          hlsUrl: channelData.playbackUrl,
+          hlsUrl: getProxiedLiveUrl(channelData.playbackUrl),
         });
         setPlayerMode("live");
         setView("player");
