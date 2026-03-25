@@ -26,6 +26,7 @@ function getCityTime(tz: string): string {
 }
 
 export default function GlobeWidget() {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const globeRef = useRef<ReturnType<typeof createGlobe> | null>(null);
   const phiRef = useRef(0);
@@ -33,6 +34,7 @@ export default function GlobeWidget() {
   const [commitCount, setCommitCount] = useState(0);
   const [cityTimes, setCityTimes] = useState<Record<string, string>>({});
   const [flowMode, setFlowMode] = useState(false);
+  const [globeSize, setGlobeSize] = useState(0);
 
   // Listen for flow mode changes
   useEffect(() => {
@@ -86,12 +88,30 @@ export default function GlobeWidget() {
     return () => clearInterval(interval);
   }, [fetchCommits]);
 
+  // Keep the globe in a true square viewport so the render stays centered.
+  useEffect(() => {
+    if (!viewportRef.current) return;
+
+    const viewport = viewportRef.current;
+
+    const updateSize = () => {
+      const { width, height } = viewport.getBoundingClientRect();
+      setGlobeSize(Math.max(0, Math.floor(Math.min(width, height))));
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(viewport);
+
+    return () => observer.disconnect();
+  }, []);
+
   // Create globe
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || globeSize === 0) return;
 
     const canvas = canvasRef.current;
-    const width = canvas.offsetWidth;
 
     // City markers (small, subtle)
     const cityMarkers: Marker[] = CITIES.map((city) => ({
@@ -101,8 +121,8 @@ export default function GlobeWidget() {
 
     const globe = createGlobe(canvas, {
       devicePixelRatio: 2,
-      width: width * 2,
-      height: width * 2,
+      width: globeSize * 2,
+      height: globeSize * 2,
       phi: 0,
       theta: 0.15,
       dark: 1,
@@ -159,16 +179,20 @@ export default function GlobeWidget() {
       cancelAnimationFrame(animFrame);
       globe.destroy();
     };
-  }, [flowMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [flowMode, globeSize]);
 
   return (
     <WidgetCard title="Globe">
-      <div className="flex items-center justify-center h-full relative overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          className="aspect-square h-full"
-          style={{ contain: "layout" }}
-        />
+      <div className="relative h-full overflow-hidden">
+        <div ref={viewportRef} className="absolute inset-x-0 top-0 bottom-8 flex items-center justify-center">
+          <div className="relative shrink-0" style={{ width: globeSize, height: globeSize }}>
+            <canvas
+              ref={canvasRef}
+              className="h-full w-full"
+              style={{ contain: "layout" }}
+            />
+          </div>
+        </div>
         {/* World clocks overlay */}
         <div className="absolute bottom-1 left-1 right-1 flex justify-center gap-3 flex-wrap">
           {CITIES.map((city) => (
