@@ -477,7 +477,7 @@ export default function KickVodWidget() {
     );
   }
 
-  const indicatorColor = flowMode ? "#ff3333" : "#53fc18";
+  const indicatorColor = flowMode ? "var(--color-red)" : "var(--color-green)";
   const isLiveActive = view === "player" && playerMode === "live" && !!playingLive;
   const indicatorLabel = isLiveActive ? "LIVE" : "VOD";
   const toggleMute = () => {
@@ -529,7 +529,10 @@ export default function KickVodWidget() {
             </span>
           </div>
         </div>
-        <div className="flex-1 min-h-0 bg-black">
+        <div
+          className="flex-1 min-h-0"
+          style={{ backgroundColor: "var(--color-media-surface)" }}
+        >
           <video
             ref={videoRef}
             className="w-full h-full"

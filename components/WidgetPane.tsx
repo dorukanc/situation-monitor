@@ -1,6 +1,12 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import {
+  applyThemePreference,
+  getStoredThemePreference,
+  THEME_STORAGE_KEY,
+  type ThemePreference,
+} from "@/lib/theme";
 import { WIDGET_REGISTRY, getWidgetMeta } from "@/lib/widget-registry";
 
 interface WidgetPaneProps {
@@ -13,7 +19,16 @@ interface WidgetPaneProps {
 export default function WidgetPane({ open, onClose, layout, onLayoutChange }: WidgetPaneProps) {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() =>
+    getStoredThemePreference()
+  );
   const dragNode = useRef<HTMLDivElement | null>(null);
+
+  const setTheme = (preference: ThemePreference) => {
+    setThemePreference(preference);
+    localStorage.setItem(THEME_STORAGE_KEY, preference);
+    applyThemePreference(document.documentElement, preference);
+  };
 
   const isEnabled = (id: string) => layout.includes(id);
 
@@ -120,7 +135,8 @@ export default function WidgetPane({ open, onClose, layout, onLayoutChange }: Wi
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 z-50 backdrop-blur-[2px]"
+        className="fixed inset-0 z-50 backdrop-blur-[2px]"
+        style={{ backgroundColor: "var(--color-overlay)" }}
         onClick={onClose}
       />
 
@@ -141,6 +157,49 @@ export default function WidgetPane({ open, onClose, layout, onLayoutChange }: Wi
 
         {/* Active widgets */}
         <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="flex items-center justify-center w-5 h-5 border border-border rounded-sm text-amber">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" className="w-3 h-3">
+                  <circle cx="10" cy="10" r="3" strokeWidth="1.5" />
+                  <path
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    d="M10 2.5v2.2M10 15.3v2.2M17.5 10h-2.2M4.7 10H2.5M15.3 4.7l-1.6 1.6M6.3 13.7l-1.6 1.6M15.3 15.3l-1.6-1.6M6.3 6.3L4.7 4.7"
+                  />
+                </svg>
+              </span>
+              <div>
+                <div className="text-[8px] uppercase tracking-[0.2em] text-muted">
+                  Theme
+                </div>
+                <div className="text-[8px] text-muted/60">
+                  System by default, with manual override
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1">
+              {(["system", "light", "dark"] as ThemePreference[]).map((option) => {
+                const active = themePreference === option;
+
+                return (
+                  <button
+                    key={option}
+                    onClick={() => setTheme(option)}
+                    className={`px-2 py-1 border text-[9px] uppercase tracking-wider transition-colors cursor-pointer ${
+                      active
+                        ? "border-green/40 bg-green/10 text-green"
+                        : "border-border text-muted hover:text-foreground hover:border-muted"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="px-4 py-2">
             <div className="text-[8px] uppercase tracking-[0.2em] text-muted mb-2">
               Active Widgets — drag to reorder

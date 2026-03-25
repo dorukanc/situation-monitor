@@ -34,17 +34,33 @@ export default function GlobeWidget() {
   const [commitCount, setCommitCount] = useState(0);
   const [cityTimes, setCityTimes] = useState<Record<string, string>>({});
   const [flowMode, setFlowMode] = useState(false);
+  const [isLightTheme, setIsLightTheme] = useState(false);
   const [globeSize, setGlobeSize] = useState(0);
 
-  // Listen for flow mode changes
+  // Listen for flow mode and theme changes
   useEffect(() => {
     const check = () => {
       setFlowMode(document.documentElement.getAttribute("data-flow") === "true");
+      const themeOverride = document.documentElement.getAttribute("data-theme");
+      const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+      setIsLightTheme(themeOverride === "light" || (themeOverride !== "dark" && prefersLight));
     };
+
     check();
+
     const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-flow"] });
-    return () => observer.disconnect();
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-flow", "data-theme"],
+    });
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: light)");
+    mediaQuery.addEventListener("change", check);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener("change", check);
+    };
   }, []);
 
   // Update city clocks every minute
@@ -125,13 +141,19 @@ export default function GlobeWidget() {
       height: globeSize * 2,
       phi: 0,
       theta: 0.15,
-      dark: 1,
-      diffuse: 1.2,
+      dark: isLightTheme ? 0 : 1,
+      diffuse: isLightTheme ? 1.05 : 1.2,
       mapSamples: 16000,
-      mapBrightness: 3,
-      baseColor: [0.12, 0.12, 0.12],
-      markerColor: flowMode ? [1, 0.2, 0.2] : [0, 1, 0.25],
-      glowColor: flowMode ? [0.15, 0.03, 0.03] : [0.03, 0.15, 0.03],
+      mapBrightness: isLightTheme ? 1.25 : 3,
+      baseColor: isLightTheme ? [0.84, 0.82, 0.77] : [0.12, 0.12, 0.12],
+      markerColor: flowMode
+        ? [0.82, 0.23, 0.19]
+        : isLightTheme
+          ? [0.14, 0.47, 0.22]
+          : [0, 1, 0.25],
+      glowColor: flowMode
+        ? (isLightTheme ? [0.55, 0.18, 0.16] : [0.15, 0.03, 0.03])
+        : (isLightTheme ? [0.76, 0.78, 0.7] : [0.03, 0.15, 0.03]),
       markers: cityMarkers,
     });
 
@@ -179,7 +201,7 @@ export default function GlobeWidget() {
       cancelAnimationFrame(animFrame);
       globe.destroy();
     };
-  }, [flowMode, globeSize]);
+  }, [flowMode, globeSize, isLightTheme]);
 
   return (
     <WidgetCard title="Globe">

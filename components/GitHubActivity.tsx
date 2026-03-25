@@ -14,6 +14,23 @@ export default function GitHubActivity() {
   const [days, setDays] = useState<DayCommits[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [flowMode, setFlowMode] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      setFlowMode(document.documentElement.getAttribute("data-flow") === "true");
+    };
+
+    check();
+
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-flow"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const fetchActivity = useCallback(async () => {
     try {
@@ -49,6 +66,7 @@ export default function GitHubActivity() {
 
   const maxCount = Math.max(...days.map((d) => d.count), 1);
   const totalCommits = days.reduce((sum, d) => sum + d.count, 0);
+  const barColor = flowMode ? "#ff3333" : "var(--green)";
 
   return (
     <WidgetCard title="GitHub Commits">
@@ -80,7 +98,7 @@ export default function GitHubActivity() {
                     style={{
                       height: `${heightPercent}%`,
                       minHeight: day.count > 0 ? "4px" : "0px",
-                      backgroundColor: day.count > 0 ? "var(--green)" : "transparent",
+                      backgroundColor: day.count > 0 ? barColor : "transparent",
                       opacity: day.count > 0 ? 0.4 + (day.count / maxCount) * 0.6 : 0,
                     }}
                   />

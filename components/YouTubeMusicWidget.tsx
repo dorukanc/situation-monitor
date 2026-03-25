@@ -136,6 +136,10 @@ export default function YouTubeMusicWidget() {
   const playerReadyRef = useRef(false);
   const volumeBeforeMuteRef = useRef(100);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const activeTabClass =
+    "text-[8px] uppercase tracking-wider px-1.5 py-0.5 border cursor-pointer";
+  const inactiveTabClass =
+    "text-[8px] uppercase tracking-wider px-1.5 py-0.5 text-muted border border-border hover:text-foreground hover:border-muted transition-colors cursor-pointer";
 
   // ── Load tokens from localStorage ──────────────────────────
   useEffect(() => {
@@ -496,13 +500,18 @@ export default function YouTubeMusicWidget() {
             <div className="flex gap-1">
               <button
                 onClick={() => setView("player")}
-                className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 text-green border border-green/30 bg-green/10 cursor-pointer"
+                className={activeTabClass}
+                style={{
+                  color: "var(--color-green)",
+                  borderColor: "color-mix(in srgb, var(--color-green) 35%, var(--color-border))",
+                  backgroundColor: "color-mix(in srgb, var(--color-green) 14%, transparent)",
+                }}
               >
                 Player
               </button>
               <button
                 onClick={() => setView("playlists")}
-                className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 text-muted border border-border hover:text-green hover:border-green/30 transition-colors cursor-pointer"
+                className={inactiveTabClass}
               >
                 Playlists
               </button>
@@ -643,9 +652,10 @@ export default function YouTubeMusicWidget() {
                   max={100}
                   value={muted ? 0 : volume}
                   onChange={(e) => handleVolumeChange(Number(e.target.value))}
-                  className="flex-1 h-1 accent-green cursor-pointer"
+                  className="flex-1 h-1 cursor-pointer"
                   style={{
-                    background: `linear-gradient(to right, var(--color-green) ${muted ? 0 : volume}%, #1a1a1a ${muted ? 0 : volume}%)`,
+                    accentColor: "var(--color-green)",
+                    background: `linear-gradient(to right, var(--color-green) ${muted ? 0 : volume}%, var(--color-slider-track) ${muted ? 0 : volume}%)`,
                   }}
                 />
                 <span className="text-[8px] text-muted w-6 text-right flex-shrink-0">
@@ -681,13 +691,18 @@ export default function YouTubeMusicWidget() {
           <div className="flex gap-1">
             <button
               onClick={() => setView("player")}
-              className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 text-muted border border-border hover:text-green hover:border-green/30 transition-colors cursor-pointer"
+              className={inactiveTabClass}
             >
               Player
             </button>
             <button
               onClick={() => setView("playlists")}
-              className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 text-green border border-green/30 bg-green/10 cursor-pointer"
+              className={activeTabClass}
+              style={{
+                color: "var(--color-green)",
+                borderColor: "color-mix(in srgb, var(--color-green) 35%, var(--color-border))",
+                backgroundColor: "color-mix(in srgb, var(--color-green) 14%, transparent)",
+              }}
             >
               Playlists
             </button>
