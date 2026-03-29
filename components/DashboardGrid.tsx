@@ -15,7 +15,10 @@ import ClockWidget from "./ClockWidget";
 import WeatherWidget from "./WeatherWidget";
 import StopwatchWidget from "./StopwatchWidget";
 import KickVodWidget from "./KickVodWidget";
+import WorkTimeWidget from "./WorkTimeWidget";
 import WidgetPane from "./WidgetPane";
+
+const WORKTIME_LAYOUT_MIGRATION_KEY = "sm-layout-migration-worktime-v1";
 
 const WIDGET_COMPONENTS: Record<string, React.ComponentType> = {
   globe: GlobeWidget,
@@ -31,6 +34,7 @@ const WIDGET_COMPONENTS: Record<string, React.ComponentType> = {
   pomodoro: PomodoroWidget,
   stopwatch: StopwatchWidget,
   kickvod: KickVodWidget,
+  worktime: WorkTimeWidget,
 };
 
 export default function DashboardGrid() {
@@ -39,18 +43,42 @@ export default function DashboardGrid() {
   const [paneOpen, setPaneOpen] = useState(false);
 
   useEffect(() => {
+    let hydrationFrameId: number | null = null;
     const stored = localStorage.getItem(LAYOUT_STORAGE_KEY);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setLayout(parsed);
+          const hasMigratedWorkTime = localStorage.getItem(WORKTIME_LAYOUT_MIGRATION_KEY) === "true";
+          const shouldAppendWorkTime = !hasMigratedWorkTime && !parsed.includes("worktime");
+          const nextLayout = shouldAppendWorkTime ? [...parsed, "worktime"] : parsed;
+          window.requestAnimationFrame(() => {
+            setLayout(nextLayout);
+          });
+          if (shouldAppendWorkTime) {
+            localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(nextLayout));
+            localStorage.setItem(WORKTIME_LAYOUT_MIGRATION_KEY, "true");
+          } else if (!hasMigratedWorkTime && parsed.includes("worktime")) {
+            localStorage.setItem(WORKTIME_LAYOUT_MIGRATION_KEY, "true");
+          }
         }
       } catch {
         // use default
+        localStorage.setItem(WORKTIME_LAYOUT_MIGRATION_KEY, "true");
       }
+    } else {
+      localStorage.setItem(WORKTIME_LAYOUT_MIGRATION_KEY, "true");
     }
-    setHydrated(true);
+
+    hydrationFrameId = window.requestAnimationFrame(() => {
+      setHydrated(true);
+    });
+
+    return () => {
+      if (hydrationFrameId !== null) {
+        window.cancelAnimationFrame(hydrationFrameId);
+      }
+    };
   }, []);
 
   const updateLayout = useCallback((newLayout: string[]) => {

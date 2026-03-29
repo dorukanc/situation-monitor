@@ -15,6 +15,7 @@ export const WIDGET_REGISTRY: WidgetMeta[] = [
   { id: "spotify", name: "Spotify", size: "normal", description: "Music player & playlists" },
   { id: "youtube", name: "YouTube", size: "normal", description: "Live stream embeds" },
   { id: "ytmusic", name: "YT Music", size: "normal", description: "YouTube Music player & playlists" },
+  { id: "worktime", name: "Work Time", size: "normal", description: "Daily and weekly flow-mode tracking" },
   { id: "clock", name: "Clock", size: "mini", description: "Current time & date" },
   { id: "efficiency", name: "Efficiency", size: "mini", description: "Daily productivity score" },
   { id: "weather", name: "Weather", size: "mini", description: "Current weather conditions" },
@@ -24,7 +25,7 @@ export const WIDGET_REGISTRY: WidgetMeta[] = [
 ];
 
 export const DEFAULT_LAYOUT: string[] = [
-  "globe", "github", "todo", "hackernews", "spotify",
+  "globe", "github", "todo", "worktime", "hackernews", "spotify",
   "clock", "efficiency", "weather", "pomodoro", "stopwatch",
 ];
 

@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { applyFlowPreference, persistFlowPreference } from "@/lib/flow";
 import { useFlowMode } from "@/hooks/useFlowMode";
+import {
+  FLOW_SESSION_CHANGE_EVENT,
+  FLOW_SESSION_HEARTBEAT_MS,
+  getActiveFlowSession,
+  getFlowSessionDurationSeconds,
+  readFlowSessions,
+  startFlowSession,
+  stopFlowSession,
+  syncFlowSessionState,
+  touchFlowSessionHeartbeat,
+} from "@/lib/flow-sessions";
 
 type FlowToggleProps = {
   initialFlow?: boolean;
@@ -11,32 +22,79 @@ type FlowToggleProps = {
 export default function FlowToggle({ initialFlow = false }: FlowToggleProps) {
   const flow = useFlowMode(initialFlow);
   const [elapsed, setElapsed] = useState(0);
-  const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const { activeSession } = syncFlowSessionState(flow);
+    const frameId = window.requestAnimationFrame(() => {
+      setElapsed(activeSession ? getFlowSessionDurationSeconds(activeSession) : 0);
+    });
+
     if (!flow) {
-      startTimeRef.current = null;
-      return;
+      return () => {
+        window.cancelAnimationFrame(frameId);
+      };
     }
 
-    if (startTimeRef.current === null) {
-      startTimeRef.current = Date.now();
-    }
-
-    const intervalId = window.setInterval(() => {
-      if (startTimeRef.current === null) return;
-      setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    const tickIntervalId = window.setInterval(() => {
+      setElapsed(readActiveFlowElapsed());
     }, 1000);
+    const heartbeatIntervalId = window.setInterval(() => {
+      touchFlowSessionHeartbeat();
+    }, FLOW_SESSION_HEARTBEAT_MS);
 
-    return () => window.clearInterval(intervalId);
+    const handlePageHide = () => {
+      touchFlowSessionHeartbeat();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        touchFlowSessionHeartbeat();
+        return;
+      }
+
+      const synced = syncFlowSessionState(true);
+      setElapsed(synced.activeSession ? getFlowSessionDurationSeconds(synced.activeSession) : 0);
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearInterval(tickIntervalId);
+      window.clearInterval(heartbeatIntervalId);
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [flow]);
+
+  useEffect(() => {
+    const handleChange = () => {
+      setElapsed(readActiveFlowElapsed());
+    };
+
+    window.addEventListener(FLOW_SESSION_CHANGE_EVENT, handleChange);
+    window.addEventListener("storage", handleChange);
+
+    return () => {
+      window.removeEventListener(FLOW_SESSION_CHANGE_EVENT, handleChange);
+      window.removeEventListener("storage", handleChange);
+    };
+  }, []);
 
   const toggle = () => {
     const next = !flow;
-    startTimeRef.current = next ? Date.now() : null;
-    setElapsed(0);
     applyFlowPreference(document.documentElement, next);
     persistFlowPreference(next);
+
+    if (next) {
+      startFlowSession();
+      setElapsed(readActiveFlowElapsed());
+      return;
+    }
+
+    stopFlowSession();
+    setElapsed(0);
   };
 
   return (
@@ -61,6 +119,11 @@ export default function FlowToggle({ initialFlow = false }: FlowToggleProps) {
       </button>
     </div>
   );
+}
+
+function readActiveFlowElapsed() {
+  const activeSession = getActiveFlowSession(readFlowSessions());
+  return activeSession ? getFlowSessionDurationSeconds(activeSession) : 0;
 }
 
 function formatDuration(totalSeconds: number) {
