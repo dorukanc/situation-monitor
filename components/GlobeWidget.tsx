@@ -144,8 +144,10 @@ export default function GlobeWidget() {
       dark: isLightTheme ? 0 : 1,
       diffuse: isLightTheme ? 1.05 : 1.2,
       mapSamples: 16000,
-      mapBrightness: isLightTheme ? 1.25 : 3,
-      baseColor: isLightTheme ? [0.84, 0.82, 0.77] : [0.12, 0.12, 0.12],
+      // Keep dark mode dark, but lift the floor slightly so the globe motion stays visible.
+      mapBrightness: isLightTheme ? 1.25 : 3.35,
+      mapBaseBrightness: isLightTheme ? 0 : 0.12,
+      baseColor: isLightTheme ? [0.84, 0.82, 0.77] : [0.16, 0.17, 0.16],
       markerColor: flowMode
         ? [0.82, 0.23, 0.19]
         : isLightTheme
@@ -153,7 +155,7 @@ export default function GlobeWidget() {
           : [0, 1, 0.25],
       glowColor: flowMode
         ? (isLightTheme ? [0.55, 0.18, 0.16] : [0.15, 0.03, 0.03])
-        : (isLightTheme ? [0.76, 0.78, 0.7] : [0.03, 0.15, 0.03]),
+        : (isLightTheme ? [0.76, 0.78, 0.7] : [0.05, 0.18, 0.05]),
       markers: cityMarkers,
     });
 

@@ -13,6 +13,20 @@
   --overlay: rgb(0 0 0 / 0.6);
   --media-surface: #000000;
   --slider-track: #1a1a1a;
+  --flow-lane-glow: rgb(255 82 82 / 0.14);
+  --flow-lane-start: #140707;
+  --flow-lane-mid: #1c0808;
+  --flow-lane-end: #260909;
+  --flow-ground-border: #b33d33;
+  --flow-ground-stripe-a: #6c1f1f;
+  --flow-ground-stripe-b: #bf453b;
+  --flow-ground-glow: rgb(255 110 94 / 0.16);
+  --flow-bubble-border: #d24b3f;
+  --flow-bubble-bg: #2b0b0b;
+  --flow-bubble-shadow: rgb(255 58 58 / 0.16);
+  --flow-bubble-text: #ffd7d1;
+  --flow-shadow-color: rgb(10 2 2 / 0.42);
+  --flow-pixel-outline: rgb(255 95 95 / 0.12);
   color-scheme: dark;
 }
 
@@ -30,6 +44,20 @@
     --overlay: rgb(27 36 29 / 0.18);
     --media-surface: #e8e1d0;
     --slider-track: #d4ccb8;
+    --flow-lane-glow: rgb(199 58 45 / 0.1);
+    --flow-lane-start: #fff8f6;
+    --flow-lane-mid: #f7e6e0;
+    --flow-lane-end: #edd3cb;
+    --flow-ground-border: #c26150;
+    --flow-ground-stripe-a: #f0b4a6;
+    --flow-ground-stripe-b: #ffd8cf;
+    --flow-ground-glow: rgb(162 65 50 / 0.12);
+    --flow-bubble-border: #cf6c5a;
+    --flow-bubble-bg: #fff6f2;
+    --flow-bubble-shadow: rgb(116 39 30 / 0.14);
+    --flow-bubble-text: #732920;
+    --flow-shadow-color: rgb(98 32 24 / 0.18);
+    --flow-pixel-outline: rgb(122 40 30 / 0.12);
     color-scheme: light;
   }
 }
@@ -47,6 +75,20 @@
   --overlay: rgb(27 36 29 / 0.18);
   --media-surface: #e8e1d0;
   --slider-track: #d4ccb8;
+  --flow-lane-glow: rgb(199 58 45 / 0.1);
+  --flow-lane-start: #fff8f6;
+  --flow-lane-mid: #f7e6e0;
+  --flow-lane-end: #edd3cb;
+  --flow-ground-border: #c26150;
+  --flow-ground-stripe-a: #f0b4a6;
+  --flow-ground-stripe-b: #ffd8cf;
+  --flow-ground-glow: rgb(162 65 50 / 0.12);
+  --flow-bubble-border: #cf6c5a;
+  --flow-bubble-bg: #fff6f2;
+  --flow-bubble-shadow: rgb(116 39 30 / 0.14);
+  --flow-bubble-text: #732920;
+  --flow-shadow-color: rgb(98 32 24 / 0.18);
+  --flow-pixel-outline: rgb(122 40 30 / 0.12);
   color-scheme: light;
 }
 
@@ -63,6 +105,20 @@
   --overlay: rgb(0 0 0 / 0.6);
   --media-surface: #000000;
   --slider-track: #1a1a1a;
+  --flow-lane-glow: rgb(255 82 82 / 0.14);
+  --flow-lane-start: #140707;
+  --flow-lane-mid: #1c0808;
+  --flow-lane-end: #260909;
+  --flow-ground-border: #b33d33;
+  --flow-ground-stripe-a: #6c1f1f;
+  --flow-ground-stripe-b: #bf453b;
+  --flow-ground-glow: rgb(255 110 94 / 0.16);
+  --flow-bubble-border: #d24b3f;
+  --flow-bubble-bg: #2b0b0b;
+  --flow-bubble-shadow: rgb(255 58 58 / 0.16);
+  --flow-bubble-text: #ffd7d1;
+  --flow-shadow-color: rgb(10 2 2 / 0.42);
+  --flow-pixel-outline: rgb(255 95 95 / 0.12);
   color-scheme: dark;
 }
 
@@ -160,6 +216,191 @@ body {
 
 .ticker-animate {
   animation: ticker-scroll 30s linear infinite;
+}
+
+.status-rail {
+  flex-shrink: 0;
+}
+
+/* Flow mode character lane */
+.flow-lane {
+  --flow-pixel-size: 4px;
+  position: relative;
+  isolation: isolate;
+  height: 100%;
+  overflow: visible;
+  clip-path: inset(-96px 0 0 0);
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, var(--flow-lane-glow), transparent 42%),
+    linear-gradient(180deg, var(--flow-lane-start) 0%, var(--flow-lane-mid) 58%, var(--flow-lane-end) 100%);
+}
+
+.flow-lane__ground {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 16px;
+  border-top: 1px dashed var(--flow-ground-border);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--flow-ground-stripe-a) 0 6px,
+      var(--flow-ground-stripe-b) 6px 12px
+    ),
+    linear-gradient(180deg, var(--flow-ground-glow), transparent 58%);
+}
+
+.flow-walker {
+  position: absolute;
+  left: 0;
+  bottom: var(--flow-bottom);
+  z-index: 2;
+  transition: transform 0.12s linear;
+  will-change: transform;
+}
+
+.flow-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 5px);
+  z-index: 3;
+  max-width: 104px;
+  padding: 4px 7px;
+  border: 1px solid var(--flow-bubble-border);
+  border-radius: 8px;
+  background: var(--flow-bubble-bg);
+  box-shadow: 0 6px 18px var(--flow-bubble-shadow);
+  transform: translateX(-50%);
+  animation: flow-bubble-pop 0.24s ease-out;
+}
+
+.flow-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid var(--flow-bubble-border);
+  border-bottom: 1px solid var(--flow-bubble-border);
+  background: var(--flow-bubble-bg);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.flow-bubble__text {
+  display: block;
+  color: var(--flow-bubble-text);
+  font-size: 8px;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-wrap: balance;
+  white-space: normal;
+}
+
+.flow-walker__body {
+  position: relative;
+  z-index: 2;
+  image-rendering: pixelated;
+  transform-origin: center bottom;
+  transform: scaleX(var(--flow-facing)) scale(var(--flow-scale));
+  animation: flow-walker-bob 0.6s steps(2, end) infinite;
+}
+
+.flow-walker__shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 26px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--flow-shadow-color);
+  filter: blur(2px);
+  transform: translateX(-50%);
+  animation: flow-shadow-pulse 0.6s steps(2, end) infinite;
+}
+
+.flow-sprite {
+  position: relative;
+  image-rendering: pixelated;
+}
+
+.flow-sprite__frame {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  transition: none;
+}
+
+.flow-sprite__frame--primary {
+  animation: flow-frame-primary 0.6s steps(1, end) infinite;
+}
+
+.flow-sprite__frame--secondary {
+  animation: flow-frame-secondary 0.6s steps(1, end) infinite;
+}
+
+.flow-sprite__pixel {
+  width: var(--flow-pixel-size);
+  height: var(--flow-pixel-size);
+  background: transparent;
+  transition: none;
+}
+
+.flow-sprite__pixel[data-filled] {
+  box-shadow: inset 0 0 0 0.5px var(--flow-pixel-outline);
+}
+
+@keyframes flow-walker-bob {
+  0%, 100% {
+    transform: translateY(0) scaleX(var(--flow-facing)) scale(var(--flow-scale));
+  }
+  50% {
+    transform: translateY(-2px) scaleX(var(--flow-facing)) scale(var(--flow-scale));
+  }
+}
+
+@keyframes flow-shadow-pulse {
+  0%, 100% {
+    transform: translateX(-50%) scaleX(1);
+    opacity: 0.34;
+  }
+  50% {
+    transform: translateX(-50%) scaleX(0.82);
+    opacity: 0.24;
+  }
+}
+
+@keyframes flow-bubble-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(3px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes flow-frame-primary {
+  0%, 49.999% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes flow-frame-secondary {
+  0%, 49.999% {
+    opacity: 0;
+  }
+  50%, 100% {
+    opacity: 1;
+  }
 }
 
 /* Pulsing status dot */

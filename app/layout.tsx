@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
+import { getFlowInitScript } from "@/lib/flow";
 import { getThemeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -28,6 +29,9 @@ export default function RootLayout({
       <body className="min-h-screen bg-background text-foreground font-mono antialiased">
         <Script id="theme-init" strategy="beforeInteractive">
           {getThemeInitScript()}
+        </Script>
+        <Script id="flow-init" strategy="beforeInteractive">
+          {getFlowInitScript()}
         </Script>
         {children}
       </body>
